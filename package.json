@@ -1,0 +1,22 @@
+{
+  "name": "aula-vr-practica-docente",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Demo WebXR (IWSDK) para Meta Quest 3: aula de práctica docente, individual.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@iwsdk/core": "^1.0.1"
+  },
+  "devDependencies": {
+    "@iwsdk/vite-plugin-dev": "^1.0.1",
+    "typescript": "^7.0.2",
+    "vite": "^7.3.7",
+    "vite-plugin-mkcert": "^2.1.0"
+  }
+}
