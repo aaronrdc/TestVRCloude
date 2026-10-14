@@ -1,12 +1,13 @@
 import * as THREE from 'three';
 import { Types, createComponent } from '@iwsdk/core';
-import { CanvasPanel, FONT, roundRect } from './panel';
+import { CanvasPanel, FONT, roundRect, wrapText } from './panel';
 
 export const enum Mood {
   Idle = 0,
   Distracted = 1,
   HandRaised = 2,
   Happy = 3,
+  Speaking = 4,
 }
 
 export const Student = createComponent(
@@ -18,12 +19,17 @@ export const Student = createComponent(
   'Estado del estudiante virtual',
 );
 
+export const NAMES = ['Ana', 'Luis', 'Marta', 'Diego', 'Sofía', 'Pablo', 'Valeria', 'Andrés'];
+
 export interface StudentRig {
+  name: string;
+  bubble: CanvasPanel;
+  bubbleUntil: number;
   group: THREE.Group;
   head: THREE.Mesh;
   arm: THREE.Mesh;
   icon: THREE.Sprite;
-  iconMaterials: Record<'hand' | 'chat' | 'ok', THREE.SpriteMaterial>;
+  iconMaterials: Record<'hand' | 'chat' | 'ok' | 'talk', THREE.SpriteMaterial>;
   baseY: number;
   phase: number; // desfase para que no se muevan al unísono
   neighborSide: number; // hacia qué lado voltea al distraerse
@@ -149,6 +155,7 @@ export function buildStudent(scene: THREE.Scene, i: number, x: number, z: number
     hand: makeIcon('?', '#16a34a'),
     chat: makeIcon('…', '#f59e0b'),
     ok: makeIcon('✓', '#2563eb'),
+    talk: makeIcon('…', '#2563eb'),
   };
   const icon = new THREE.Sprite(iconMaterials.hand);
   icon.scale.set(0.28, 0.28, 1);
@@ -156,10 +163,15 @@ export function buildStudent(scene: THREE.Scene, i: number, x: number, z: number
   icon.visible = false;
   g.add(icon);
 
+  const bubble = new CanvasPanel(0.95, 0.32, 480);
+  bubble.mesh.position.set(0, 2.2, 0.1);
+  bubble.mesh.visible = false;
+  g.add(bubble.mesh);
+
   g.rotation.y = 0; // mira hacia +z (el docente)
   scene.add(g);
 
-  return { group: g, head, arm, icon, iconMaterials, baseY: 1.4, phase: i * 1.7, neighborSide: i % 2 === 0 ? 1 : -1 };
+  return { name: NAMES[i % NAMES.length], bubble, bubbleUntil: 0, group: g, head, arm, icon, iconMaterials, baseY: 1.4, phase: i * 1.7, neighborSide: i % 2 === 0 ? 1 : -1 };
 }
 
 export function drawLabel(panel: CanvasPanel, text: string, enabled = true, hovered = false) {
@@ -172,5 +184,42 @@ export function drawLabel(panel: CanvasPanel, text: string, enabled = true, hove
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(text, w / 2, h / 2 + 2);
+  });
+}
+
+/** Muestra un globo de texto sobre el estudiante durante `seconds`. */
+export function say(rig: StudentRig, text: string, now: number, seconds = 3.5) {
+  rig.bubble.draw((ctx, w, h) => {
+    roundRect(ctx, 4, 4, w - 8, h - 8, h * 0.25);
+    ctx.fillStyle = 'rgba(255,255,255,0.96)';
+    ctx.fill();
+    ctx.strokeStyle = '#94a3b8';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    ctx.fillStyle = '#0f172a';
+    ctx.font = `600 ${h * 0.24}px ${FONT}`;
+    ctx.textBaseline = 'top';
+    ctx.textAlign = 'left';
+    wrapText(ctx, text, w * 0.05, h * 0.14, w * 0.9, h * 0.29);
+  });
+  rig.bubble.mesh.visible = true;
+  rig.bubbleUntil = now + seconds;
+}
+
+/** Botón de opción de respuesta (texto largo, alineado a la izquierda). */
+export function drawOption(panel: CanvasPanel, index: number, text: string, hovered = false) {
+  panel.draw((ctx, w, h) => {
+    roundRect(ctx, 4, 4, w - 8, h - 8, h * 0.25);
+    ctx.fillStyle = hovered ? '#1d4ed8' : '#1e40af';
+    ctx.fill();
+    ctx.fillStyle = '#bfdbfe';
+    ctx.font = `700 ${h * 0.34}px ${FONT}`;
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'left';
+    ctx.fillText(`${String.fromCharCode(65 + index)}`, w * 0.025, h / 2 + 2);
+    ctx.fillStyle = '#fff';
+    ctx.font = `500 ${h * 0.25}px ${FONT}`;
+    ctx.textBaseline = 'top';
+    wrapText(ctx, text, w * 0.07, h * 0.15, w * 0.91, h * 0.3);
   });
 }

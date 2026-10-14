@@ -1,6 +1,7 @@
 import { Entity, Pressed, RayInteractable, createSystem } from '@iwsdk/core';
 import * as THREE from 'three';
-import { Mood, Student, StudentRig } from './classroom';
+import { Mood, Student, StudentRig, drawOption, say } from './classroom';
+import { distractedLines, pickQuestion, recoveredLines, shuffle } from './questions';
 import {
   endTeaching,
   goToSlide,
@@ -11,11 +12,12 @@ import {
   toast,
 } from './state';
 import { CanvasPanel } from './panel';
-import { drawCenter, drawHud, drawScreen } from './ui';
+import { drawCenter, drawDialog, drawHud, drawScreen } from './ui';
 import { drawLabel } from './classroom';
 import { lesson } from './lesson';
 
-export type ButtonId = 'start' | 'retry' | 'prev' | 'next' | 'end';
+export type ButtonId = 'start' | 'retry' | 'prev' | 'next' | 'end' | 'opt0' | 'opt1' | 'opt2';
+const OPTION_IDS: ButtonId[] = ['opt0', 'opt1', 'opt2'];
 
 
 export interface Buttons {
@@ -30,6 +32,7 @@ export interface Scene3D {
   screen: CanvasPanel;
   center: CanvasPanel;
   hud: CanvasPanel;
+  dialog: CanvasPanel;
 }
 
 let ctxRef: Scene3D;
@@ -79,8 +82,12 @@ export class ClassroomSystem extends createSystem({
 
     this.handlePresses(t);
 
-    if (session.phase === 'teaching') this.scheduleEvents(t);
+    this.updateDialogue(t, delta);
+    if (session.phase === 'teaching' && !session.dialogue) this.scheduleEvents(t);
     this.animateStudents(t, delta);
+    this.updateBubbles(t);
+    const asking = session.dialogue?.stage === 'asking';
+    OPTION_IDS.forEach((id) => (s.buttons.panels[id].mesh.visible = !!asking));
 
     if (session.dirty || (session.phase === 'teaching' && t >= this.nextHudAt)) {
       this.redraw();
@@ -102,6 +109,10 @@ export class ClassroomSystem extends createSystem({
     show('prev', session.phase === 'teaching');
     show('next', session.phase === 'teaching');
     show('end', session.phase === 'teaching');
+    this.queries.students.entities.forEach((e) => {
+      const rig = s.rigs.get(e.index);
+      if (rig) rig.bubble.mesh.visible = false;
+    });
     session.dirty = true;
   }
 
@@ -130,11 +141,16 @@ export class ClassroomSystem extends createSystem({
           startTeaching();
         }
         break;
+      case 'opt0':
+      case 'opt1':
+      case 'opt2':
+        this.answer(OPTION_IDS.indexOf(id));
+        break;
       case 'prev':
-        if (session.phase === 'teaching') goToSlide(session.slide - 1);
+        if (session.phase === 'teaching' && !session.dialogue) goToSlide(session.slide - 1);
         break;
       case 'next':
-        if (session.phase !== 'teaching') break;
+        if (session.phase !== 'teaching' || session.dialogue) break;
         if (session.slide === lesson.slides.length - 1) toast('Última diapositiva. Pulsa "Terminar" cuando acabes.', 'info');
         else goToSlide(session.slide + 1);
         break;
@@ -145,19 +161,25 @@ export class ClassroomSystem extends createSystem({
   }
 
   private onStudent(ent: Entity, t: number) {
+    if (session.dialogue) {
+      toast('Responde primero la pregunta abierta', 'info', 2);
+      return;
+    }
     const mood = ent.getValue(Student, 'mood') as number;
     const since = ent.getValue(Student, 'since') as number;
     if (mood === Mood.HandRaised) {
       session.hands.attended++;
       session.hands.responseTimes.push(t - since);
-      ent.setValue(Student, 'mood', Mood.Happy);
+      ent.setValue(Student, 'mood', Mood.Speaking);
       ent.setValue(Student, 'since', t);
-      toast(`Participación atendida (${(t - since).toFixed(1)} s)`, 'good');
+      this.openDialogue(ent.index);
       beep(880, 0.15);
     } else if (mood === Mood.Distracted) {
       session.distractions.recovered++;
       ent.setValue(Student, 'mood', Mood.Happy);
       ent.setValue(Student, 'since', t);
+      const rig = ctxRef.rigs.get(ent.index);
+      if (rig) say(rig, recoveredLines[Math.floor(Math.random() * recoveredLines.length)], t);
       toast('Atención recuperada', 'good');
       beep(740, 0.15);
     } else {
@@ -202,6 +224,8 @@ export class ClassroomSystem extends createSystem({
     } else {
       session.distractions.total++;
       pick.setValue(Student, 'mood', Mood.Distracted);
+      const rig = ctxRef.rigs.get(pick.index);
+      if (rig) say(rig, distractedLines[Math.floor(Math.random() * distractedLines.length)], t, 4);
     }
     pick.setValue(Student, 'since', t);
     beep(520, 0.07);
@@ -247,8 +271,69 @@ export class ClassroomSystem extends createSystem({
       } else if (mood === Mood.Happy) {
         icon.material = rig.iconMaterials.ok;
         icon.visible = true;
+      } else if (mood === Mood.Speaking) {
+        icon.material = rig.iconMaterials.talk;
+        icon.visible = true;
       } else icon.visible = false;
       icon.position.y = 1.85 + Math.sin(t * 4 + rig.phase) * 0.03;
+    });
+  }
+
+  private openDialogue(entityIndex: number) {
+    const rig = ctxRef.rigs.get(entityIndex);
+    if (!rig) return;
+    const { id, q } = pickQuestion(session.slide, session.asked);
+    if (id >= 0) session.asked.add(id);
+    session.dialogue = {
+      entity: entityIndex,
+      name: rig.name,
+      question: q,
+      options: shuffle(q.options),
+      stage: 'asking',
+      closeAt: 0,
+    };
+    session.dirty = true;
+  }
+
+  private answer(i: number) {
+    const d = session.dialogue;
+    if (!d || d.stage !== 'asking') return;
+    const opt = d.options[i];
+    if (!opt) return;
+    d.chosen = opt;
+    d.stage = 'feedback';
+    d.closeAt = now() + 4.5;
+    session.answers[opt.quality]++;
+    const rig = ctxRef.rigs.get(d.entity);
+    if (rig) say(rig, opt.reply, now(), 4);
+    beep(opt.quality === 'good' ? 880 : opt.quality === 'ok' ? 600 : 260, 0.18, opt.quality === 'poor' ? 'square' : 'sine');
+    session.dirty = true;
+  }
+
+  /** Cierra el diálogo tras la retroalimentación y pausa los temporizadores mientras está abierto. */
+  private updateDialogue(t: number, delta: number) {
+    const d = session.dialogue;
+    if (!d) return;
+    // mientras hay diálogo, los temporizadores de manos/distracciones no avanzan
+    this.nextEventAt += delta;
+    this.queries.students.entities.forEach((e) => {
+      const mood = e.getValue(Student, 'mood') as number;
+      if (mood === Mood.HandRaised || mood === Mood.Distracted) e.setValue(Student, 'since', (e.getValue(Student, 'since') as number) + delta);
+    });
+    if (d.stage === 'feedback' && t >= d.closeAt) {
+      const ent = [...this.queries.students.entities].find((e) => e.index === d.entity);
+      if (ent) {
+        ent.setValue(Student, 'mood', Mood.Happy);
+        ent.setValue(Student, 'since', t);
+      }
+      session.dialogue = null;
+      session.dirty = true;
+    }
+  }
+
+  private updateBubbles(t: number) {
+    ctxRef.rigs.forEach((rig) => {
+      if (rig.bubble.mesh.visible && t > rig.bubbleUntil) rig.bubble.mesh.visible = false;
     });
   }
 
@@ -257,11 +342,16 @@ export class ClassroomSystem extends createSystem({
     drawScreen(s.screen);
     drawCenter(s.center);
     drawHud(s.hud);
+    drawDialog(s.dialog);
+    const d = session.dialogue;
+    OPTION_IDS.forEach((id, i) => {
+      if (d && d.stage === 'asking' && d.options[i]) drawOption(s.buttons.panels[id], i, d.options[i].text);
+    });
     const nextLabel = session.slide === lesson.slides.length - 1 ? 'Final' : 'Siguiente ▶';
     drawLabel(s.buttons.panels.start, s.buttons.labels.start);
     drawLabel(s.buttons.panels.retry, s.buttons.labels.retry);
-    drawLabel(s.buttons.panels.prev, '◀ Anterior', session.slide > 0);
-    drawLabel(s.buttons.panels.next, nextLabel, session.slide < lesson.slides.length - 1);
+    drawLabel(s.buttons.panels.prev, '◀ Anterior', session.slide > 0 && !d);
+    drawLabel(s.buttons.panels.next, nextLabel, session.slide < lesson.slides.length - 1 && !d);
     drawLabel(s.buttons.panels.end, 'Terminar');
   }
 }

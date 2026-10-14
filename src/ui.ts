@@ -2,6 +2,7 @@ import { CanvasPanel, FONT, roundRect, wrapText } from './panel';
 import { lesson } from './lesson';
 import { computeSummary, fmtTime } from './score';
 import { elapsed, now, session } from './state';
+import { QUALITY_SCORE } from './questions';
 
 const BG = '#0f172a';
 
@@ -70,9 +71,9 @@ export function drawCenter(panel: CanvasPanel) {
       const lines = [
         'Darás una mini-clase a 8 estudiantes virtuales.',
         'Avanza las diapositivas con los botones del atril.',
-        'Apunta y presiona sobre quien levante la mano (?) para darle la palabra.',
+        'Si alguien levanta la mano (?), apúntale: hará una pregunta y elegirás cómo responder.',
         'Si alguien se distrae (…), apúntale para recuperar su atención.',
-        'Al terminar verás tu resumen y rúbrica.',
+        'Al terminar verás tu rúbrica y sugerencias.',
       ];
       for (const l of lines) y = wrapText(ctx, '• ' + l, pad, y, w - pad * 2, h * 0.065) + h * 0.01;
       return;
@@ -90,7 +91,7 @@ export function drawCenter(panel: CanvasPanel) {
     ctx.fillStyle = '#cbd5e1';
     ctx.fillText(`Duración: ${fmtTime(sum.seconds)}`, w * 0.36, h * 0.17);
 
-    let y = h * 0.3;
+    let y = h * 0.27;
     const barW = w * 0.42;
     for (const it of sum.items) {
       ctx.fillStyle = '#e2e8f0';
@@ -105,7 +106,7 @@ export function drawCenter(panel: CanvasPanel) {
       ctx.fillStyle = '#94a3b8';
       ctx.font = `${h * 0.036}px ${FONT}`;
       ctx.fillText(`${it.value}% · ${it.detail}`, pad + barW + w * 0.02, y + h * 0.05);
-      y += h * 0.125;
+      y += h * 0.105;
     }
 
     ctx.fillStyle = '#fbbf24';
@@ -135,5 +136,44 @@ export function drawHud(panel: CanvasPanel) {
     ctx.font = `${h * 0.24}px ${FONT}`;
     ctx.fillStyle = showToast ? (session.toast.tone === 'good' ? '#4ade80' : session.toast.tone === 'warn' ? '#fbbf24' : '#93c5fd') : '#64748b';
     ctx.fillText(showToast ? session.toast.text : 'Atiende ? y … en los estudiantes', w * 0.05, h * 0.72);
+  });
+}
+
+/** Panel de diálogo: pregunta del estudiante o retroalimentación de la respuesta. */
+export function drawDialog(panel: CanvasPanel) {
+  const d = session.dialogue;
+  panel.mesh.visible = !!d && session.phase === 'teaching';
+  if (!d) return;
+  panel.draw((ctx, w, h) => {
+    roundRect(ctx, 0, 0, w, h, h * 0.12);
+    ctx.fillStyle = 'rgba(15,23,42,0.95)';
+    ctx.fill();
+    ctx.textBaseline = 'top';
+    ctx.textAlign = 'left';
+    const pad = w * 0.04;
+    ctx.fillStyle = '#93c5fd';
+    ctx.font = `600 ${h * 0.09}px ${FONT}`;
+    ctx.fillText(d.stage === 'asking' ? `${d.name} pregunta:` : `Tu respuesta a ${d.name}`, pad, h * 0.08);
+    ctx.fillStyle = '#fff';
+    if (d.stage === 'asking' || !d.chosen) {
+      ctx.font = `600 ${h * 0.14}px ${FONT}`;
+      wrapText(ctx, `“${d.question.text}”`, pad, h * 0.26, w - pad * 2, h * 0.17);
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = `${h * 0.075}px ${FONT}`;
+      ctx.fillText('Elige cómo responder ▼', pad, h * 0.86);
+    } else {
+      const q = QUALITY_SCORE[d.chosen.quality];
+      const color = q === 1 ? '#4ade80' : q > 0 ? '#fbbf24' : '#f87171';
+      const title = q === 1 ? 'Muy bien' : q > 0 ? 'Aceptable' : 'Mejorable';
+      ctx.fillStyle = color;
+      ctx.font = `700 ${h * 0.15}px ${FONT}`;
+      ctx.fillText(title, pad, h * 0.26);
+      ctx.fillStyle = '#e2e8f0';
+      ctx.font = `${h * 0.1}px ${FONT}`;
+      wrapText(ctx, d.chosen.feedback, pad, h * 0.46, w - pad * 2, h * 0.13);
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = `italic ${h * 0.09}px ${FONT}`;
+      wrapText(ctx, `${d.name}: “${d.chosen.reply}”`, pad, h * 0.76, w - pad * 2, h * 0.11);
+    }
   });
 }

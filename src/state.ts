@@ -1,7 +1,18 @@
 import { lesson } from './lesson';
+import { Option, Question } from './questions';
 
 export type Phase = 'menu' | 'teaching' | 'summary';
 export type ToastTone = 'info' | 'good' | 'warn';
+
+export interface Dialogue {
+  entity: number; // entity.index del estudiante que pregunta
+  name: string;
+  question: Question;
+  options: Option[]; // ya barajadas
+  stage: 'asking' | 'feedback';
+  chosen?: Option;
+  closeAt: number;
+}
 
 export interface Session {
   phase: Phase;
@@ -13,6 +24,9 @@ export interface Session {
   visited: Set<number>;
   hands: { raised: number; attended: number; missed: number; responseTimes: number[] };
   distractions: { total: number; recovered: number; ignored: number };
+  answers: { good: number; ok: number; poor: number };
+  asked: Set<number>;
+  dialogue: Dialogue | null;
   directed: number; // clics sobre estudiantes sin necesidad
   toast: { text: string; tone: ToastTone; until: number };
   dirty: boolean; // fuerza redibujar paneles
@@ -31,6 +45,9 @@ function fresh(): Session {
     visited: new Set(),
     hands: { raised: 0, attended: 0, missed: 0, responseTimes: [] },
     distractions: { total: 0, recovered: 0, ignored: 0 },
+    answers: { good: 0, ok: 0, poor: 0 },
+    asked: new Set(),
+    dialogue: null,
     directed: 0,
     toast: { text: '', tone: 'info', until: 0 },
     dirty: true,
@@ -75,6 +92,7 @@ export function startTeaching() {
 export function endTeaching() {
   commitSlideTime();
   session.phase = 'summary';
+  session.dialogue = null;
   session.endAt = now();
   session.dirty = true;
 }

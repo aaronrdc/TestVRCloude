@@ -39,14 +39,19 @@ async function main() {
   }
 
   // --- Paneles y botones ---
-  const center = new CanvasPanel(1.8, 1.1, 640);
-  center.mesh.position.set(0, 1.78, -1.9);
+  const center = new CanvasPanel(1.8, 1.3, 640);
+  center.mesh.position.set(0, 1.85, -1.9);
   scene.add(center.mesh);
 
   const hud = new CanvasPanel(1.2, 0.3, 700);
-  hud.mesh.position.set(-0.75, 1.8, -1.5);
+  hud.mesh.position.set(-0.75, 1.95, -1.5);
   hud.mesh.rotation.y = 0.35;
   scene.add(hud.mesh);
+
+  const dialog = new CanvasPanel(1.5, 0.6, 720);
+  dialog.mesh.position.set(0, 1.45, -1.55);
+  dialog.mesh.visible = false;
+  scene.add(dialog.mesh);
 
   const labels: Record<ButtonId, string> = {
     start: 'Comenzar clase',
@@ -54,16 +59,22 @@ async function main() {
     prev: '◀ Anterior',
     next: 'Siguiente ▶',
     end: 'Terminar',
+    opt0: '',
+    opt1: '',
+    opt2: '',
   };
   const panels = {} as Record<ButtonId, CanvasPanel>;
   const buttonByEntity: Scene3D['buttonByEntity'] = new Map();
   const place: Record<ButtonId, [number, number, number, number, number]> = {
     // [x, y, z, ancho, alto]
-    start: [0, 1.08, -1.85, 0.7, 0.18],
-    retry: [0, 1.08, -1.85, 0.7, 0.18],
+    start: [0, 1.0, -1.85, 0.7, 0.18],
+    retry: [0, 1.0, -1.85, 0.7, 0.18],
     prev: [-0.4, 0.98, -0.78, 0.36, 0.13],
     next: [0, 0.98, -0.78, 0.36, 0.13],
     end: [0.4, 0.98, -0.78, 0.36, 0.13],
+    opt0: [0, 1.0, -1.5, 1.5, 0.16],
+    opt1: [0, 0.82, -1.5, 1.5, 0.16],
+    opt2: [0, 0.64, -1.5, 1.5, 0.16],
   };
   for (const id of Object.keys(place) as ButtonId[]) {
     const [x, y, z, w, h] = place[id];
@@ -71,14 +82,15 @@ async function main() {
     p.mesh.position.set(x, y, z);
     if (id === 'prev' || id === 'next' || id === 'end') p.mesh.rotation.x = -0.6;
     scene.add(p.mesh);
-    drawLabel(p, labels[id]);
+    if (id.startsWith('opt')) p.mesh.visible = false;
+    if (!id.startsWith('opt')) drawLabel(p, labels[id]);
     const ent = world.createTransformEntity(p.mesh);
     ent.addComponent(RayInteractable);
     panels[id] = p;
     buttonByEntity.set(ent.index, id);
   }
 
-  bindScene({ rigs, buttonByEntity, buttons: { panels, labels }, screen, center, hud });
+  bindScene({ rigs, buttonByEntity, buttons: { panels, labels }, screen, center, hud, dialog });
   world.registerSystem(ClassroomSystem);
 
   // --- Botón DOM para entrar en VR ---
@@ -98,7 +110,7 @@ async function main() {
   }
   // Para depuración desde la consola.
   (window as unknown as { world: World; aula: unknown }).world = world;
-  (window as unknown as { aula: unknown }).aula = { session, startTeaching, endTeaching, goToSlide };
+  (window as unknown as { aula: unknown }).aula = { session, startTeaching, endTeaching, goToSlide, Student, sys: () => world.getSystem(ClassroomSystem) };
 }
 
 main().catch((err) => {
