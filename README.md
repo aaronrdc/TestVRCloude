@@ -43,6 +43,9 @@ src/lesson.ts     Contenido de la clase
 src/questions.ts  Preguntas, opciones de respuesta y frases de los estudiantes
 ```
 
+## Diagnóstico dentro del casco
+Abre la URL con `?debug` al final (`.../TestVRCloude/?debug`). Aparece un panel con FPS, peor frame, draw calls, texturas y los últimos errores.
+
 ## Estado y pendientes
 - Verificado: typecheck, `vite build` y render/flujo de la sesión en Chromium headless (sin XR).
 - **Sin verificar aún en el casco:** la selección con rayo/pellizco sobre estudiantes y botones, el confort y el rendimiento (~70 draw calls previstos).

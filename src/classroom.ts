@@ -28,8 +28,8 @@ export interface StudentRig {
   group: THREE.Group;
   head: THREE.Mesh;
   arm: THREE.Mesh;
-  icon: THREE.Sprite;
-  iconMaterials: Record<'hand' | 'chat' | 'ok' | 'talk', THREE.SpriteMaterial>;
+  icon: THREE.Mesh;
+  iconMaterials: Record<'hand' | 'chat' | 'ok' | 'talk', THREE.MeshBasicMaterial>;
   baseY: number;
   phase: number; // desfase para que no se muevan al unísono
   neighborSide: number; // hacia qué lado voltea al distraerse
@@ -38,7 +38,7 @@ export interface StudentRig {
 const SKIN = [0xf1c27d, 0xe0ac69, 0xc68642, 0x8d5524, 0xffdbac, 0xd8a47f, 0xb77a50, 0xf3d1a5];
 const SHIRT = [0x2563eb, 0x16a34a, 0xdb2777, 0x9333ea, 0xea580c, 0x0891b2, 0xca8a04, 0x475569];
 
-function makeIcon(label: string, color: string): THREE.SpriteMaterial {
+function makeIcon(label: string, color: string): THREE.MeshBasicMaterial {
   const c = document.createElement('canvas');
   c.width = c.height = 128;
   const ctx = c.getContext('2d')!;
@@ -53,7 +53,7 @@ function makeIcon(label: string, color: string): THREE.SpriteMaterial {
   ctx.fillText(label, 64, 70);
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
-  return new THREE.SpriteMaterial({ map: tex, transparent: true, toneMapped: false, depthTest: false });
+  return new THREE.MeshBasicMaterial({ map: tex, transparent: true, toneMapped: false, depthTest: false });
 }
 
 export function buildRoom(scene: THREE.Scene) {
@@ -157,15 +157,20 @@ export function buildStudent(scene: THREE.Scene, i: number, x: number, z: number
     ok: makeIcon('✓', '#2563eb'),
     talk: makeIcon('…', '#2563eb'),
   };
-  const icon = new THREE.Sprite(iconMaterials.hand);
-  icon.scale.set(0.28, 0.28, 1);
+  // Plano (no Sprite): los estudiantes miran siempre a +z, no hace falta billboard.
+  // OJO: Sprite.raycast lanza TypeError si el Raycaster no tiene cámara (caso de los
+  // punteros XR de IWSDK) y eso congela el bucle de render dentro del casco.
+  const icon = new THREE.Mesh(new THREE.PlaneGeometry(0.28, 0.28), iconMaterials.hand);
   icon.position.set(0, 1.85, 0);
+  icon.renderOrder = 10;
   icon.visible = false;
+  icon.raycast = () => {}; // decorativo: nunca intercepta el rayo
   g.add(icon);
 
   const bubble = new CanvasPanel(0.95, 0.32, 480);
   bubble.mesh.position.set(0, 2.2, 0.1);
   bubble.mesh.visible = false;
+  bubble.mesh.raycast = () => {}; // decorativo: el clic lo recibe el estudiante
   g.add(bubble.mesh);
 
   g.rotation.y = 0; // mira hacia +z (el docente)

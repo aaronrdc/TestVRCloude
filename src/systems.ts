@@ -69,6 +69,7 @@ export class ClassroomSystem extends createSystem({
   private lastPhase = '';
   private nextHudAt = 0;
   private tmp = new THREE.Vector3();
+  private tmp2 = new THREE.Vector3();
 
   update(delta: number, _time: number) {
     const t = now();
@@ -89,10 +90,13 @@ export class ClassroomSystem extends createSystem({
     const asking = session.dialogue?.stage === 'asking';
     OPTION_IDS.forEach((id) => (s.buttons.panels[id].mesh.visible = !!asking));
 
-    if (session.dirty || (session.phase === 'teaching' && t >= this.nextHudAt)) {
+    if (session.dirty) {
       this.redraw();
       this.nextHudAt = t + 0.5;
       session.dirty = false;
+    } else if (session.phase === 'teaching' && t >= this.nextHudAt) {
+      drawHud(s.hud); // solo el reloj/toast: evita resubir texturas grandes cada 0.5 s
+      this.nextHudAt = t + 0.5;
     }
   }
 
@@ -248,7 +252,7 @@ export class ClassroomSystem extends createSystem({
         targetYaw = rig.neighborSide * (0.9 + Math.sin(t * 2 + rig.phase) * 0.15);
         targetPitch = 0.12;
       } else {
-        const toCam = this.tmp.clone().sub(rig.group.position);
+        const toCam = this.tmp2.copy(this.tmp).sub(rig.group.position);
         targetYaw = THREE.MathUtils.clamp(Math.atan2(toCam.x, toCam.z), -0.6, 0.6);
         targetPitch = mood === Mood.Happy ? Math.sin(t * 12) * 0.15 : 0;
       }

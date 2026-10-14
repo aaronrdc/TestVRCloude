@@ -2,6 +2,7 @@ import { RayInteractable, ReferenceSpaceType, SessionMode, World } from '@iwsdk/
 import { Student, buildRoom, buildScreen, buildStudent, drawLabel } from './classroom';
 import { CanvasPanel } from './panel';
 import { endTeaching, goToSlide, session, startTeaching } from './state';
+import { installDebug } from './debug';
 import { ButtonId, ClassroomSystem, Scene3D, bindScene, beep } from './systems';
 
 const container = document.getElementById('scene-container') as HTMLDivElement;
@@ -92,6 +93,7 @@ async function main() {
 
   bindScene({ rigs, buttonByEntity, buttons: { panels, labels }, screen, center, hud, dialog });
   world.registerSystem(ClassroomSystem);
+  if (new URLSearchParams(location.search).has('debug')) installDebug(world);
 
   // --- Botón DOM para entrar en VR ---
   const xr = navigator.xr;

@@ -15,6 +15,9 @@ export class CanvasPanel {
     this.texture = new THREE.CanvasTexture(this.canvas);
     this.texture.colorSpace = THREE.SRGBColorSpace;
     this.texture.anisotropy = 4;
+    // Sin mipmaps: estos canvas se redibujan; regenerarlos en cada subida es costoso en Quest.
+    this.texture.generateMipmaps = false;
+    this.texture.minFilter = THREE.LinearFilter;
     this.mesh = new THREE.Mesh(
       new THREE.PlaneGeometry(width, height),
       new THREE.MeshBasicMaterial({ map: this.texture, transparent: true, toneMapped: false }),
