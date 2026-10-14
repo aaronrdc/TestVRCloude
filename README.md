@@ -12,6 +12,7 @@ mini-clase a 8 estudiantes virtuales. Construida con [IWSDK](https://github.com/
 - **Diálogos (nivel A, texto):** al dar la palabra, el estudiante hace una **pregunta ligada a la diapositiva actual** y eliges entre
   3 respuestas (precisa, parcial o débil) con retroalimentación inmediata. Los estudiantes también hablan con globos de texto
   (distraídos y al recuperar su atención). Las preguntas están en `src/questions.ts` (editable).
+- El resumen final es un **carrusel de páginas** (puntuación y criterios, luego sugerencias): botones **◀ Pág. / Pág. ▶** o el **joystick** (arriba/abajo/izquierda/derecha, o clic del joystick). En escritorio, flechas del teclado.
 - Al terminar: **rúbrica** con cobertura, atención a participaciones, calidad de las respuestas, manejo de la atención y ritmo, más sugerencias.
 
 ## Ejecutar

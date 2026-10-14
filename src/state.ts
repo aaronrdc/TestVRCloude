@@ -29,6 +29,7 @@ export interface Session {
   dialogue: Dialogue | null;
   directed: number; // clics sobre estudiantes sin necesidad
   toast: { text: string; tone: ToastTone; until: number };
+  summaryPage: number;
   dirty: boolean; // fuerza redibujar paneles
 }
 
@@ -50,6 +51,7 @@ function fresh(): Session {
     dialogue: null,
     directed: 0,
     toast: { text: '', tone: 'info', until: 0 },
+    summaryPage: 0,
     dirty: true,
   };
 }

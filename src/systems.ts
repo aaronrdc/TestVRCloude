@@ -1,4 +1,4 @@
-import { Entity, Pressed, RayInteractable, createSystem } from '@iwsdk/core';
+import { Entity, InputComponent, Pressed, RayInteractable, createSystem } from '@iwsdk/core';
 import * as THREE from 'three';
 import { Mood, Student, StudentRig, drawOption, say } from './classroom';
 import { distractedLines, pickQuestion, recoveredLines, shuffle } from './questions';
@@ -12,11 +12,12 @@ import {
   toast,
 } from './state';
 import { CanvasPanel } from './panel';
-import { drawCenter, drawDialog, drawHud, drawScreen } from './ui';
+import { drawCenter, drawDialog, drawHud, drawScreen, summaryPageCount } from './ui';
+import { computeSummary } from './score';
 import { drawLabel } from './classroom';
 import { lesson } from './lesson';
 
-export type ButtonId = 'start' | 'retry' | 'prev' | 'next' | 'end' | 'opt0' | 'opt1' | 'opt2';
+export type ButtonId = 'start' | 'retry' | 'prev' | 'next' | 'end' | 'opt0' | 'opt1' | 'opt2' | 'pagePrev' | 'pageNext';
 const OPTION_IDS: ButtonId[] = ['opt0', 'opt1', 'opt2'];
 
 
@@ -82,6 +83,7 @@ export class ClassroomSystem extends createSystem({
     }
 
     this.handlePresses(t);
+    this.handleJoystick();
 
     this.updateDialogue(t, delta);
     if (session.phase === 'teaching' && !session.dialogue) this.scheduleEvents(t);
@@ -113,6 +115,8 @@ export class ClassroomSystem extends createSystem({
     show('prev', session.phase === 'teaching');
     show('next', session.phase === 'teaching');
     show('end', session.phase === 'teaching');
+    show('pagePrev', session.phase === 'summary');
+    show('pageNext', session.phase === 'summary');
     this.queries.students.entities.forEach((e) => {
       const rig = s.rigs.get(e.index);
       if (rig) rig.bubble.mesh.visible = false;
@@ -135,6 +139,27 @@ export class ClassroomSystem extends createSystem({
     });
   }
 
+  /** Cambia de página del resumen (cíclico). */
+  private turnPage(dir: 1 | -1) {
+    if (session.phase !== 'summary') return;
+    const pages = summaryPageCount(computeSummary(session).tips.length);
+    session.summaryPage = (session.summaryPage + dir + pages) % pages;
+    session.dirty = true;
+    beep(520, 0.05);
+  }
+
+  /** Joystick (cualquier mano): abajo/derecha = siguiente, arriba/izquierda = anterior, clic = siguiente. */
+  private handleJoystick() {
+    if (session.phase !== 'summary') return;
+    for (const hand of ['left', 'right'] as const) {
+      const pad = this.input.gamepads[hand];
+      if (!pad) continue;
+      const stick = InputComponent.Thumbstick;
+      if (pad.getAxesEnteringDown(stick) || pad.getAxesEnteringRight(stick) || pad.getButtonDown(stick)) this.turnPage(1);
+      else if (pad.getAxesEnteringUp(stick) || pad.getAxesEnteringLeft(stick)) this.turnPage(-1);
+    }
+  }
+
   private onButton(id: ButtonId) {
     beep(660, 0.08);
     switch (id) {
@@ -144,6 +169,12 @@ export class ClassroomSystem extends createSystem({
           if (id === 'retry') resetSession();
           startTeaching();
         }
+        break;
+      case 'pagePrev':
+        this.turnPage(-1);
+        break;
+      case 'pageNext':
+        this.turnPage(1);
         break;
       case 'opt0':
       case 'opt1':
@@ -357,5 +388,7 @@ export class ClassroomSystem extends createSystem({
     drawLabel(s.buttons.panels.prev, '◀ Anterior', session.slide > 0 && !d);
     drawLabel(s.buttons.panels.next, nextLabel, session.slide < lesson.slides.length - 1 && !d);
     drawLabel(s.buttons.panels.end, 'Terminar');
+    drawLabel(s.buttons.panels.pagePrev, '◀ Pág.');
+    drawLabel(s.buttons.panels.pageNext, 'Pág. ▶');
   }
 }

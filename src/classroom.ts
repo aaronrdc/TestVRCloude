@@ -223,8 +223,26 @@ export function drawOption(panel: CanvasPanel, index: number, text: string, hove
     ctx.textAlign = 'left';
     ctx.fillText(`${String.fromCharCode(65 + index)}`, w * 0.025, h / 2 + 2);
     ctx.fillStyle = '#fff';
-    ctx.font = `500 ${h * 0.25}px ${FONT}`;
     ctx.textBaseline = 'top';
-    wrapText(ctx, text, w * 0.07, h * 0.15, w * 0.91, h * 0.3);
+    // Reduce la fuente hasta que el texto quepa (máx. 3 líneas) dentro del botón.
+    let size = h * 0.25;
+    const maxW = w * 0.9;
+    const lines = (sz: number) => {
+      ctx.font = `500 ${sz}px ${FONT}`;
+      let n = 1;
+      let line = '';
+      for (const word of text.split(' ')) {
+        const t = line ? `${line} ${word}` : word;
+        if (ctx.measureText(t).width > maxW && line) {
+          n++;
+          line = word;
+        } else line = t;
+      }
+      return n;
+    };
+    while (size > h * 0.14 && lines(size) * size * 1.2 > h * 0.82) size -= 1;
+    ctx.font = `500 ${size}px ${FONT}`;
+    const used = lines(size) * size * 1.2;
+    wrapText(ctx, text, w * 0.07, (h - used) / 2 + size * 0.1, w * 0.9, size * 1.2);
   });
 }

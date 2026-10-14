@@ -63,6 +63,8 @@ async function main() {
     opt0: '',
     opt1: '',
     opt2: '',
+    pagePrev: '◀ Pág.',
+    pageNext: 'Pág. ▶',
   };
   const panels = {} as Record<ButtonId, CanvasPanel>;
   const buttonByEntity: Scene3D['buttonByEntity'] = new Map();
@@ -73,6 +75,8 @@ async function main() {
     prev: [-0.4, 0.98, -0.78, 0.36, 0.13],
     next: [0, 0.98, -0.78, 0.36, 0.13],
     end: [0.4, 0.98, -0.78, 0.36, 0.13],
+    pagePrev: [-0.62, 1.0, -1.85, 0.4, 0.18],
+    pageNext: [0.62, 1.0, -1.85, 0.4, 0.18],
     opt0: [0, 1.0, -1.5, 1.5, 0.16],
     opt1: [0, 0.82, -1.5, 1.5, 0.16],
     opt2: [0, 0.64, -1.5, 1.5, 0.16],
@@ -83,8 +87,9 @@ async function main() {
     p.mesh.position.set(x, y, z);
     if (id === 'prev' || id === 'next' || id === 'end') p.mesh.rotation.x = -0.6;
     scene.add(p.mesh);
-    if (id.startsWith('opt')) p.mesh.visible = false;
+    if (id.startsWith('opt') || id.startsWith('page')) p.mesh.visible = false;
     if (!id.startsWith('opt')) drawLabel(p, labels[id]);
+
     const ent = world.createTransformEntity(p.mesh);
     ent.addComponent(RayInteractable);
     panels[id] = p;
@@ -110,6 +115,13 @@ async function main() {
     enterBtn.textContent = 'WebXR no disponible';
     hint.textContent = 'Abre esta página en el Quest Browser (HTTPS). En escritorio, usa el emulador de desarrollo (npm run dev).';
   }
+  // Atajo en escritorio: flechas para cambiar de página del resumen (pruebas sin casco).
+  window.addEventListener('keydown', (e) => {
+    if (session.phase !== 'summary') return;
+    const sys = world.getSystem(ClassroomSystem) as unknown as { turnPage(d: 1 | -1): void };
+    if (e.key === 'ArrowDown' || e.key === 'ArrowRight') sys.turnPage(1);
+    if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') sys.turnPage(-1);
+  });
   // Para depuración desde la consola.
   (window as unknown as { world: World; aula: unknown }).world = world;
   (window as unknown as { aula: unknown }).aula = { session, startTeaching, endTeaching, goToSlide, Student, sys: () => world.getSystem(ClassroomSystem) };

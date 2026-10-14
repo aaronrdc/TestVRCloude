@@ -62,7 +62,7 @@ export function computeSummary(s: Session): Summary {
   if (s.hands.responseTimes.length) tips.push(`Tiempo medio de respuesta a manos: ${avg(s.hands.responseTimes).toFixed(1)} s.`);
   if (!tips.length) tips.push('¡Muy buena sesión! Intenta de nuevo para mejorar tu puntuación.');
 
-  return { items, total: totalScore, seconds, tips: tips.slice(0, 3) };
+  return { items, total: totalScore, seconds, tips: tips.slice(0, 8) };
 }
 
 export const fmtTime = (sec: number) => {
